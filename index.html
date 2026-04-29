@@ -466,7 +466,7 @@
 
 <!-- TOOLBAR -->
 <div id="toolbar">
-  <span class="tb-logo">✦ Organise ur brainz ✦</span>
+  <span class="tb-logo">✦ Gedankenverwaltung ✦</span>
   <div class="tb-sep"></div>
 
   <span class="tb-label">Form</span>
@@ -480,6 +480,9 @@
   <button class="tb-btn" id="btn-connect" title="Connect nodes">🔗 Verbinden</button>
   <button class="tb-btn danger" id="btn-remove-link" title="Del Line">✕ Linie löschen</button>
   <button class="tb-btn" id="btn-save-png" title="Export png">💾 PNG Export</button>
+  <button class="tb-btn" id="btn-save-json" title="Bearbeitbare Mindmap herunterladen">⬇ Mindmap speichern</button>
+  <button class="tb-btn" id="btn-load-json" title="Bearbeitbare Mindmap laden">⬆ Mindmap laden</button>
+  <input type="file" id="inp-load-json" accept="application/json,.json" style="display:none">
   
   <div class="tb-sep"></div>
   <span class="tb-label">Füllfarbe</span>
@@ -627,6 +630,151 @@ function init() {
   setTimeout(() => hint.classList.add('hidden'), 4000);
   updateCanvas();
 }
+//------------------------------
+//save mindmap file
+//----------------------------
+
+function getMindmapData() {
+  return {
+    app: 'organise-ur-brainz',
+    version: 1,
+    savedAt: new Date().toISOString(),
+    state: {
+      nodes: state.nodes,
+      links: state.links,
+      idCounter: state.idCounter,
+      shape: state.shape,
+      fillColor: state.fillColor,
+      lineColor: state.lineColor,
+      textColor: state.textColor,
+      font: state.font,
+      fontSize: state.fontSize,
+      bold: state.bold,
+      italic: state.italic,
+      underline: state.underline,
+      panX: state.panX,
+      panY: state.panY,
+      zoom: state.zoom
+    }
+  };
+}
+
+function downloadMindmapJson() {
+  const data = getMindmapData();
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const date = new Date().toISOString().slice(0, 10);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `mindmap-${date}.json`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function clearMindmapDom() {
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  linesEl.innerHTML = '';
+}
+
+function loadMindmapData(data) {
+  if (!data || !data.state || !Array.isArray(data.state.nodes)) {
+    alert('Diese Datei ist keine gültige Mindmap-Datei.');
+    return;
+  }
+
+  clearMindmapDom();
+
+  state.nodes = [];
+  state.links = Array.isArray(data.state.links) ? data.state.links : [];
+  state.idCounter = Number(data.state.idCounter) || 0;
+
+  state.shape = data.state.shape || 'rounded';
+  state.fillColor = data.state.fillColor || '#ff5774';
+  state.lineColor = data.state.lineColor || '#57d4ff';
+  state.textColor = data.state.textColor || '#0a0a0a';
+  state.font = data.state.font || "'DM Sans', sans-serif";
+  state.fontSize = Number(data.state.fontSize) || 14;
+  state.bold = !!data.state.bold;
+  state.italic = !!data.state.italic;
+  state.underline = !!data.state.underline;
+
+  state.panX = Number(data.state.panX) || 0;
+  state.panY = Number(data.state.panY) || 0;
+  state.zoom = Number(data.state.zoom) || 1;
+
+  data.state.nodes.forEach(node => {
+    const restoredNode = {
+      id: Number(node.id),
+      x: Number(node.x) || 0,
+      y: Number(node.y) || 0,
+      text: String(node.text || ''),
+      shape: node.shape || 'rounded',
+      fill: node.fill || '#ff5774',
+      lineColor: node.lineColor || '#57d4ff',
+      textColor: node.textColor || '#0a0a0a',
+      font: node.font || "'DM Sans', sans-serif",
+      fontSize: Number(node.fontSize) || 14,
+      bold: !!node.bold,
+      italic: !!node.italic,
+      underline: !!node.underline,
+      done: !!node.done,
+      isCenter: !!node.isCenter
+    };
+
+    state.nodes.push(restoredNode);
+    renderNode(restoredNode);
+  });
+
+  state.idCounter = Math.max(
+    state.idCounter,
+    ...state.nodes.map(node => node.id)
+  );
+
+  applyTransform();
+  updateLines();
+}
+
+function loadMindmapJsonFile(file) {
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      loadMindmapData(data);
+    } catch (err) {
+      alert('Die Datei konnte nicht gelesen werden.');
+      console.error(err);
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+document.getElementById('btn-save-json').addEventListener('click', downloadMindmapJson);
+
+document.getElementById('btn-load-json').addEventListener('click', () => {
+  document.getElementById('inp-load-json').click();
+});
+
+document.getElementById('inp-load-json').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (state.nodes.length > 0) {
+    const ok = confirm('Die aktuelle Mindmap wird ersetzt. Fortfahren?');
+    if (!ok) {
+      e.target.value = '';
+      return;
+    }
+  }
+
+  loadMindmapJsonFile(file);
+  e.target.value = '';
+});
+
 
 // ════════════════════════════════════════════
 //  NODE FACTORY
