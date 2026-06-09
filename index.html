@@ -233,6 +233,8 @@
     transition: transform 0.15s;
   }
   .node:hover .node-inner { transform: scale(1.03); }
+  .node-inner[style*="min-width"] { transition: none; }
+  .node-inner[style*="min-width"]:hover { transform: none; }
 
   .node-bg {
     position: absolute;
@@ -286,6 +288,29 @@
   /* center node */
   .node.center-node .node-inner { cursor: default; }
   .node.center-node { z-index: 10; }
+
+  /* ── RESIZE HANDLES ── */
+  .resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border: 2px solid var(--accent);
+    border-radius: 3px;
+    z-index: 700;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: all;
+  }
+  .node:hover .resize-handle { opacity: 1; }
+  .resize-handle.nw { top: -5px;    left: -5px;   cursor: nw-resize; }
+  .resize-handle.n  { top: -5px;    left: calc(50% - 5px); cursor: n-resize; }
+  .resize-handle.ne { top: -5px;    right: -5px;  cursor: ne-resize; }
+  .resize-handle.e  { top: calc(50% - 5px); right: -5px; cursor: e-resize; }
+  .resize-handle.se { bottom: -5px; right: -5px;  cursor: se-resize; }
+  .resize-handle.s  { bottom: -5px; left: calc(50% - 5px); cursor: s-resize; }
+  .resize-handle.sw { bottom: -5px; left: -5px;   cursor: sw-resize; }
+  .resize-handle.w  { top: calc(50% - 5px); left: -5px; cursor: w-resize; }
 
   /* ── NODE CONTROLS ── */
   .node-controls {
@@ -451,6 +476,159 @@
     font-family: 'Syne', sans-serif;
   }
   #task-badge.visible { display: block; }
+
+  /* ── IMAGE MODE ── */
+  .node-inner {
+    overflow: hidden;
+  }
+  .node-inner.has-image .node-text {
+    position: relative;
+    z-index: 3;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 14px rgba(0,0,0,0.7);
+    color: #fff !important;
+  }
+
+  /* ── CROP MODAL ── */
+  #crop-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #crop-modal.visible { display: flex; }
+
+  #crop-modal-box {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 18px;
+    padding: 24px;
+    width: min(560px, 95vw);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+  }
+
+  #crop-modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f0f0f0;
+    letter-spacing: 0.5px;
+  }
+
+  #crop-viewport {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #0a0a0a;
+    cursor: crosshair;
+  }
+
+  #crop-img {
+    position: absolute;
+    transform-origin: 0 0;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  #crop-overlay {
+    position: absolute;
+    inset: 0;
+    border: 2px dashed rgba(255,87,116,0.7);
+    pointer-events: none;
+    border-radius: 8px;
+  }
+
+  #crop-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .crop-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .crop-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    width: 60px;
+    flex-shrink: 0;
+  }
+
+  .crop-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: #2a2a2a;
+    outline: none;
+    cursor: pointer;
+  }
+  .crop-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  .crop-val {
+    font-size: 11px;
+    color: #888;
+    width: 38px;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #crop-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 4px;
+  }
+
+  .crop-btn {
+    padding: 8px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: all 0.15s;
+  }
+  .crop-btn.primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .crop-btn.primary:hover { filter: brightness(1.1); }
+  .crop-btn.cancel {
+    background: transparent;
+    color: #888;
+  }
+  .crop-btn.cancel:hover { background: #1e1e1e; color: #f0f0f0; }
+  .crop-btn.remove-img {
+    background: transparent;
+    color: var(--accent2);
+    border-color: rgba(255,107,107,0.3);
+    margin-right: auto;
+  }
+  .crop-btn.remove-img:hover { background: rgba(255,107,107,0.1); }
 </style>
 </head>
 <body>
@@ -479,6 +657,7 @@
   <button class="tb-btn shape-btn" data-shape="hexagon" title="Hexagon">⬡</button>
   <button class="tb-btn" id="btn-connect" title="Connect nodes">🔗 Verbinden</button>
   <button class="tb-btn danger" id="btn-remove-link" title="Del Line">✕ Linie löschen</button>
+  <button class="tb-btn" id="btn-image-mode" title="Bild in Knoten einfügen">🖼 Bild einfügen</button>
   <button class="tb-btn" id="btn-save-png" title="Export png">💾 PNG Export</button>
   <button class="tb-btn" id="btn-save-json" title="Bearbeitbare Mindmap herunterladen">⬇ Mindmap speichern</button>
   <button class="tb-btn" id="btn-load-json" title="Bearbeitbare Mindmap laden">⬆ Mindmap laden</button>
@@ -557,6 +736,40 @@
 <!-- HINT -->
 <div id="hint">Doppelklick auf Knoten zum Bearbeiten · Ziehen zum Verschieben</div>
 
+<!-- CROP MODAL -->
+<div id="crop-modal">
+  <div id="crop-modal-box">
+    <div id="crop-modal-title">🖼 Bild anpassen</div>
+    <div id="crop-viewport">
+      <img id="crop-img" src="" alt="">
+      <div id="crop-overlay"></div>
+    </div>
+    <div id="crop-controls">
+      <div class="crop-row">
+        <span class="crop-label">Zoom</span>
+        <input class="crop-slider" type="range" id="crop-scale" min="10" max="300" value="100" step="1">
+        <span class="crop-val" id="crop-scale-val">100%</span>
+      </div>
+      <div class="crop-row">
+        <span class="crop-label">X-Versatz</span>
+        <input class="crop-slider" type="range" id="crop-x" min="-500" max="500" value="0" step="1">
+        <span class="crop-val" id="crop-x-val">0</span>
+      </div>
+      <div class="crop-row">
+        <span class="crop-label">Y-Versatz</span>
+        <input class="crop-slider" type="range" id="crop-y" min="-500" max="500" value="0" step="1">
+        <span class="crop-val" id="crop-y-val">0</span>
+      </div>
+    </div>
+    <div id="crop-actions">
+      <button class="crop-btn remove-img" id="crop-remove-btn">🗑 Bild entfernen</button>
+      <button class="crop-btn cancel" id="crop-cancel-btn">Abbrechen</button>
+      <button class="crop-btn primary" id="crop-apply-btn">✓ Übernehmen</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="inp-image" accept="image/*" style="display:none">
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
@@ -590,6 +803,7 @@ const state = {
   links: [],
   connectMode: false,
   connectSourceId: null,
+  imageMode: false,
 };
 
 let popupTarget = null;
@@ -721,7 +935,15 @@ function loadMindmapData(data) {
       italic: !!node.italic,
       underline: !!node.underline,
       done: !!node.done,
-      isCenter: !!node.isCenter
+      isCenter: !!node.isCenter,
+      image: node.image || null,
+      imgScale: Number(node.imgScale) || 100,
+      imgX: Number(node.imgX) || 0,
+      imgY: Number(node.imgY) || 0,
+      w: node.w || null,
+      h: node.h || null,
+      imgNaturalW: node.imgNaturalW || null,
+      imgNaturalH: node.imgNaturalH || null,
     };
 
     state.nodes.push(restoredNode);
@@ -781,7 +1003,7 @@ document.getElementById('inp-load-json').addEventListener('change', (e) => {
 // ════════════════════════════════════════════
 function createNode({ x, y, text, shape, fill, lineColor, textColor, font, fontSize, bold, italic, underline, isCenter = false }) {
   const id = ++state.idCounter;
-  const node = { id, x, y, text, shape, fill, lineColor, textColor, font, fontSize, bold, italic, underline, done: false, isCenter };
+  const node = { id, x, y, text, shape, fill, lineColor, textColor, font, fontSize, bold, italic, underline, done: false, isCenter, image: null, imgScale: 100, imgX: 0, imgY: 0, w: null, h: null, imgNaturalW: null, imgNaturalH: null };
   state.nodes.push(node);
   renderNode(node);
   return node;
@@ -820,6 +1042,15 @@ function renderNode(node) {
     inner.appendChild(txt);
     el.appendChild(inner);
 
+    // ── Resize handles (8 directions) ──
+    ['nw','n','ne','e','se','s','sw','w'].forEach(dir => {
+      const h = document.createElement('div');
+      h.className = 'resize-handle ' + dir;
+      h.dataset.dir = dir;
+      h.addEventListener('mousedown', onResizeMouseDown);
+      el.appendChild(h);
+    });
+
     el.addEventListener('mousedown', onNodeMouseDown);
     txt.addEventListener('focus', (e) => e.stopPropagation());
     txt.addEventListener('blur', () => {
@@ -832,6 +1063,11 @@ function renderNode(node) {
     });
     
     el.addEventListener('click', (e) => {
+      if (state.imageMode) {
+        e.stopPropagation();
+        openImageEditor(node);
+        return;
+      }
       if (state.taskMode && !node.isCenter) {
         node.done = !node.done;
         applyNodeStyle(node);
@@ -876,7 +1112,6 @@ function applyNodeStyle(node) {
   const txt = el.querySelector('.node-text');
 
   bg.className = 'node-bg ' + node.shape;
-  bg.style.background = node.fill;
   bg.style.boxShadow = `0 0 0 1.5px ${hexAlpha(node.fill, 0.4)}, 0 2px 16px ${hexAlpha(node.fill, 0.25)}`;
 
   txt.style.fontFamily = node.font;
@@ -893,6 +1128,46 @@ function applyNodeStyle(node) {
   if (node.shape === 'diamond') txt.style.padding = '14px 20px';
   else if (node.shape === 'heart' || node.shape === 'star') txt.style.padding = '16px 12px';
   else txt.style.padding = '10px 18px';
+
+  // ── Image rendering ──
+  const inner = el.querySelector('.node-inner');
+  // Remove any leftover child image div from old approach
+  const oldImgEl = bg.querySelector('.node-image');
+  if (oldImgEl) oldImgEl.remove();
+
+  if (node.image) {
+    const offX = node.imgX || 0;
+    const offY = node.imgY || 0;
+    const userScale = (node.imgScale || 100) / 100;
+
+    bg.style.backgroundImage = `url(${node.image})`;
+    bg.style.backgroundRepeat = 'no-repeat';
+
+    if (node.imgNaturalW && node.imgNaturalH) {
+      // Compute cover-equivalent size: scale image so it fills the node, then multiply by user zoom
+      const nodeW = bg.offsetWidth  || inner.offsetWidth  || 130;
+      const nodeH = bg.offsetHeight || inner.offsetHeight || 70;
+      const nw = node.imgNaturalW, nh = node.imgNaturalH;
+      const coverRatio = Math.max(nodeW / nw, nodeH / nh);
+      const finalW = Math.round(nw * coverRatio * userScale);
+      const finalH = Math.round(nh * coverRatio * userScale);
+      bg.style.backgroundSize = `${finalW}px ${finalH}px`;
+    } else {
+      // Fallback: use cover (no zoom control but at least centered)
+      bg.style.backgroundSize = 'cover';
+    }
+
+    bg.style.backgroundPosition = `calc(50% + ${offX}px) calc(50% + ${offY}px)`;
+    bg.style.backgroundColor = hexAlpha(node.fill, 0.25);
+    inner.classList.add('has-image');
+  } else {
+    bg.style.backgroundImage = '';
+    bg.style.backgroundSize  = '';
+    bg.style.backgroundPosition = '';
+    bg.style.backgroundColor = '';
+    bg.style.background = node.fill;
+    inner.classList.remove('has-image');
+  }
 }
 
 function updateNodeSize(node) {
@@ -900,8 +1175,21 @@ function updateNodeSize(node) {
   if (!el) return;
   const inner = el.querySelector('.node-inner');
   const bg = el.querySelector('.node-bg');
-  inner.style.width = '';
-  inner.style.height = '';
+
+  if (node.w) {
+    inner.style.width  = node.w + 'px';
+    inner.style.minWidth = node.w + 'px';
+  } else {
+    inner.style.width = '';
+    inner.style.minWidth = '';
+  }
+  if (node.h) {
+    inner.style.height    = node.h + 'px';
+    inner.style.minHeight = node.h + 'px';
+  } else {
+    inner.style.height = '';
+    inner.style.minHeight = '';
+  }
 
   requestAnimationFrame(() => {
     const w = inner.offsetWidth;
@@ -920,6 +1208,132 @@ function updateNodeSize(node) {
     updateLines();
   });
 }
+
+// ════════════════════════════════════════════
+//  IMAGE MODE
+// ════════════════════════════════════════════
+let cropTargetNode = null;
+let cropImgDataUrl = null;
+
+document.getElementById('btn-image-mode').addEventListener('click', () => {
+  state.imageMode = !state.imageMode;
+  state.taskMode = false; state.removeMode = false; state.connectMode = false; state.removeLinkMode = false;
+  const btn = document.getElementById('btn-image-mode');
+  btn.classList.toggle('active', state.imageMode);
+  taskBadge.textContent = '🖼 BILD-MODUS — Knoten anklicken';
+  taskBadge.style.background = '#8b5cf6';
+  taskBadge.classList.toggle('visible', state.imageMode);
+  canvasWrap.style.cursor = state.imageMode ? 'crosshair' : 'default';
+  ['btn-task','btn-remove','btn-connect','btn-remove-link'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+});
+
+function openImageEditor(node) {
+  cropTargetNode = node;
+  if (node.image) {
+    cropImgDataUrl = node.image;
+    showCropModal(node.image, node.imgScale || 100, node.imgX || 0, node.imgY || 0);
+  } else {
+    const inp = document.getElementById('inp-image');
+    inp.value = '';
+    inp.click();
+  }
+}
+
+document.getElementById('inp-image').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file || !cropTargetNode) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    cropImgDataUrl = ev.target.result;
+    showCropModal(cropImgDataUrl, 100, 0, 0);
+  };
+  reader.readAsDataURL(file);
+});
+
+function showCropModal(imgSrc, scale, offX, offY) {
+  const modal = document.getElementById('crop-modal');
+  const img = document.getElementById('crop-img');
+  img.src = imgSrc;
+  document.getElementById('crop-scale').value = scale;
+  document.getElementById('crop-x').value = offX;
+  document.getElementById('crop-y').value = offY;
+  document.getElementById('crop-scale-val').textContent = scale + '%';
+  document.getElementById('crop-x-val').textContent = offX;
+  document.getElementById('crop-y-val').textContent = offY;
+  img.onload = () => updateCropPreview();
+  modal.classList.add('visible');
+  // If image already loaded (cached), trigger preview immediately after modal is shown
+  if (img.complete && img.naturalWidth) requestAnimationFrame(updateCropPreview);
+  document.getElementById('crop-remove-btn').style.display = cropTargetNode?.image ? 'inline-flex' : 'none';
+}
+
+function updateCropPreview() {
+  const img = document.getElementById('crop-img');
+  if (!img.naturalWidth) return;
+  const userScale = parseFloat(document.getElementById('crop-scale').value) / 100;
+  const offX = parseInt(document.getElementById('crop-x').value) || 0;
+  const offY = parseInt(document.getElementById('crop-y').value) || 0;
+  const vp = document.getElementById('crop-viewport');
+  const vpW = vp.offsetWidth, vpH = vp.offsetHeight;
+  const nw = img.naturalWidth, nh = img.naturalHeight;
+
+  // Cover: scale so image fills the viewport, then multiply by userScale
+  const coverRatio = Math.max(vpW / nw, vpH / nh);
+  const displayW = nw * coverRatio * userScale;
+  const displayH = nh * coverRatio * userScale;
+
+  // Center in viewport, then apply offset
+  img.style.width  = displayW + 'px';
+  img.style.height = displayH + 'px';
+  img.style.transform = '';
+  img.style.transformOrigin = '';
+  img.style.left = ((vpW - displayW) / 2 + offX) + 'px';
+  img.style.top  = ((vpH - displayH) / 2 + offY) + 'px';
+}
+
+['crop-scale','crop-x','crop-y'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    const val = document.getElementById(id).value;
+    const labelEl = document.getElementById(id + '-val');
+    if (labelEl) labelEl.textContent = id === 'crop-scale' ? val + '%' : val;
+    updateCropPreview();
+  });
+});
+
+document.getElementById('crop-apply-btn').addEventListener('click', () => {
+  if (!cropTargetNode) return;
+  const img = document.getElementById('crop-img');
+  cropTargetNode.image = cropImgDataUrl;
+  cropTargetNode.imgScale = parseInt(document.getElementById('crop-scale').value);
+  cropTargetNode.imgX = parseInt(document.getElementById('crop-x').value);
+  cropTargetNode.imgY = parseInt(document.getElementById('crop-y').value);
+  cropTargetNode.imgNaturalW = img.naturalWidth;
+  cropTargetNode.imgNaturalH = img.naturalHeight;
+  applyNodeStyle(cropTargetNode);
+  closeCropModal();
+});
+
+document.getElementById('crop-remove-btn').addEventListener('click', () => {
+  if (!cropTargetNode) return;
+  cropTargetNode.image = null;
+  cropTargetNode.imgScale = 100;
+  cropTargetNode.imgX = 0;
+  cropTargetNode.imgY = 0;
+  applyNodeStyle(cropTargetNode);
+  closeCropModal();
+});
+
+document.getElementById('crop-cancel-btn').addEventListener('click', closeCropModal);
+
+function closeCropModal() {
+  document.getElementById('crop-modal').classList.remove('visible');
+  cropTargetNode = null;
+  cropImgDataUrl = null;
+}
+
+document.getElementById('crop-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('crop-modal')) closeCropModal();
+});
 
 function positionNode(node) {
   const el = document.getElementById('node-' + node.id);
@@ -1032,7 +1446,7 @@ function removeNode(id) {
 // ════════════════════════════════════════════
 function onNodeMouseDown(e) {
   // 1. Abbruch bei Menüs oder Spezialmodi
-  if (e.target.closest('.node-controls') || state.taskMode || state.removeMode) return;
+  if (e.target.closest('.node-controls') || e.target.closest('.resize-handle') || state.taskMode || state.removeMode || state.imageMode) return;
 
   const el = e.currentTarget;
   const node = state.nodes.find(n => 'node-' + n.id === el.id);
@@ -1059,7 +1473,86 @@ function onNodeMouseDown(e) {
   el.classList.add('dragging');
 }
 
+// ════════════════════════════════════════════
+//  RESIZE
+// ════════════════════════════════════════════
+let resizeNode = null;
+let resizeDir = '';
+let resizeStartX = 0, resizeStartY = 0;
+let resizeStartW = 0, resizeStartH = 0;
+let resizeStartNodeX = 0, resizeStartNodeY = 0;
+const MIN_NODE_W = 80, MIN_NODE_H = 40;
+
+function onResizeMouseDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const el = e.currentTarget.closest('.node');
+  const node = state.nodes.find(n => 'node-' + n.id === el.id);
+  if (!node) return;
+
+  resizeNode = node;
+  resizeDir  = e.currentTarget.dataset.dir;
+
+  const inner = el.querySelector('.node-inner');
+  resizeStartW = inner.offsetWidth;
+  resizeStartH = inner.offsetHeight;
+  resizeStartX = e.clientX;
+  resizeStartY = e.clientY;
+  resizeStartNodeX = node.x;
+  resizeStartNodeY = node.y;
+
+  // snapshot current size into node so it's "locked in"
+  node.w = resizeStartW;
+  node.h = resizeStartH;
+
+  document.body.style.cursor = e.currentTarget.style.cursor || 'se-resize';
+}
+
 document.addEventListener('mousemove', (e) => {
+  if (resizeNode) {
+    const dx = (e.clientX - resizeStartX) / state.zoom;
+    const dy = (e.clientY - resizeStartY) / state.zoom;
+    const dir = resizeDir;
+
+    let newW = resizeStartW;
+    let newH = resizeStartH;
+    let newX = resizeStartNodeX;
+    let newY = resizeStartNodeY;
+
+    if (dir.includes('e'))  newW = Math.max(MIN_NODE_W, resizeStartW + dx);
+    if (dir.includes('s'))  newH = Math.max(MIN_NODE_H, resizeStartH + dy);
+    if (dir.includes('w')) {
+      newW = Math.max(MIN_NODE_W, resizeStartW - dx);
+      newX = resizeStartNodeX + (resizeStartW - newW);
+    }
+    if (dir.includes('n')) {
+      newH = Math.max(MIN_NODE_H, resizeStartH - dy);
+      newY = resizeStartNodeY + (resizeStartH - newH);
+    }
+
+    resizeNode.w = newW;
+    resizeNode.h = newH;
+    resizeNode.x = newX;
+    resizeNode.y = newY;
+
+    const el = document.getElementById('node-' + resizeNode.id);
+    const inner = el?.querySelector('.node-inner');
+    const bg = el?.querySelector('.node-bg');
+    if (inner) {
+      inner.style.width    = newW + 'px';
+      inner.style.minWidth = newW + 'px';
+      inner.style.height    = newH + 'px';
+      inner.style.minHeight = newH + 'px';
+    }
+    if (bg) {
+      bg.style.width  = newW + 'px';
+      bg.style.height = newH + 'px';
+    }
+    positionNode(resizeNode);
+    updateLines();
+    return;
+  }
+
   if (dragNode) {
   const canvasRect = canvasWrap.getBoundingClientRect();
   // Präzise Berechnung ohne Viewport-Abhängigkeit
@@ -1079,6 +1572,10 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => {
   if (dragNode) document.getElementById('node-' + dragNode.id)?.classList.remove('dragging');
   dragNode = null;
+  if (resizeNode) {
+    document.body.style.cursor = '';
+    resizeNode = null;
+  }
   state.isPanning = false;
   canvasWrap.style.cursor = 'default';
 });
@@ -1155,22 +1652,26 @@ document.querySelectorAll('.shape-btn').forEach(btn => btn.addEventListener('cli
 });
 
 document.getElementById('btn-task').addEventListener('click', () => {
-  state.taskMode = !state.taskMode; state.removeMode = false; state.connectMode = false; state.removeLinkMode = false;
+  state.taskMode = !state.taskMode; state.removeMode = false; state.connectMode = false; state.removeLinkMode = false; state.imageMode = false;
+  document.getElementById('btn-image-mode')?.classList.remove('active');
   updateToolbarUI('btn-task', '☑ ERLEDIGT-MODUS AKTIV', 'var(--accent2)');
 });
 
 document.getElementById('btn-remove').addEventListener('click', () => {
-  state.removeMode = !state.removeMode; state.taskMode = false; state.connectMode = false; state.removeLinkMode = false;
+  state.removeMode = !state.removeMode; state.taskMode = false; state.connectMode = false; state.removeLinkMode = false; state.imageMode = false;
+  document.getElementById('btn-image-mode')?.classList.remove('active');
   updateToolbarUI('btn-remove', '✕ LÖSCH-MODUS AKTIV', 'var(--accent)');
 });
 
 document.getElementById('btn-connect').addEventListener('click', () => {
-  state.connectMode = !state.connectMode; state.taskMode = false; state.removeMode = false; state.removeLinkMode = false;
+  state.connectMode = !state.connectMode; state.taskMode = false; state.removeMode = false; state.removeLinkMode = false; state.imageMode = false;
+  document.getElementById('btn-image-mode')?.classList.remove('active');
   updateToolbarUI('btn-connect', '🔗 VERBINDUNGS-MODUS AKTIV', 'var(--accent3)');
 });
 
 document.getElementById('btn-remove-link').addEventListener('click', () => {
-  state.removeLinkMode = !state.removeLinkMode; state.taskMode = false; state.removeMode = false; state.connectMode = false;
+  state.removeLinkMode = !state.removeLinkMode; state.taskMode = false; state.removeMode = false; state.connectMode = false; state.imageMode = false;
+  document.getElementById('btn-image-mode')?.classList.remove('active');
   updateToolbarUI('btn-remove-link', '✕ LINIEN-LÖSCH-MODUS AKTIV', '#ff6b6b');
 });
 
@@ -1182,6 +1683,44 @@ function updateToolbarUI(activeId, text, color) {
   taskBadge.textContent = text; taskBadge.style.background = color;
   canvasWrap.style.cursor = activeMode ? 'crosshair' : 'default';
 }
+
+// Font, Size, Bold, Italic, Underline
+document.getElementById('sel-font').addEventListener('change', (e) => { state.font = e.target.value; });
+document.getElementById('inp-fsize').addEventListener('input', (e) => { state.fontSize = parseInt(e.target.value) || 14; });
+document.getElementById('btn-bold').addEventListener('click', () => {
+  state.bold = !state.bold;
+  document.getElementById('btn-bold').classList.toggle('active', state.bold);
+});
+document.getElementById('btn-italic').addEventListener('click', () => {
+  state.italic = !state.italic;
+  document.getElementById('btn-italic').classList.toggle('active', state.italic);
+});
+document.getElementById('btn-under').addEventListener('click', () => {
+  state.underline = !state.underline;
+  document.getElementById('btn-under').classList.toggle('active', state.underline);
+});
+
+// Color popup wheel sync
+document.getElementById('popup-wheel').addEventListener('input', (e) => {
+  document.getElementById('popup-hex').value = e.target.value;
+});
+document.getElementById('popup-hex').addEventListener('input', (e) => {
+  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) document.getElementById('popup-wheel').value = e.target.value;
+});
+
+// Color presets
+const presetColors = ['#ff5774','#57d4ff','#c8ff57','#ff6b6b','#a78bfa','#34d399','#fbbf24','#f472b6','#0a0a0a','#f0f0f0'];
+const presetsEl = document.getElementById('popup-presets');
+presetColors.forEach(c => {
+  const dot = document.createElement('div');
+  dot.className = 'preset-dot';
+  dot.style.background = c;
+  dot.addEventListener('click', () => {
+    document.getElementById('popup-hex').value = c;
+    document.getElementById('popup-wheel').value = c;
+  });
+  presetsEl.appendChild(dot);
+});
 
 document.getElementById('btn-reset-view').addEventListener('click', () => { state.panX = 0; state.panY = 0; state.zoom = 1; applyTransform(); });
 
