@@ -248,11 +248,15 @@
     outline: none;
     text-align: center;
     word-break: break-word;
-    max-width: 220px;
-    min-width: 40px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
     line-height: 1.3;
     cursor: text;
-    padding: 2px;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* shapes via clip-path / border-radius on node-bg */
@@ -288,6 +292,12 @@
   /* center node */
   .node.center-node .node-inner { cursor: default; }
   .node.center-node { z-index: 10; }
+
+  /* selected node ring */
+  .node.selected .node-bg {
+    outline: 2.5px solid rgba(255,87,116,0.85);
+    outline-offset: 2px;
+  }
 
   /* ── RESIZE HANDLES ── */
   .resize-handle {
@@ -804,6 +814,7 @@ const state = {
   connectMode: false,
   connectSourceId: null,
   imageMode: false,
+  selectedNode: null,
 };
 
 let popupTarget = null;
@@ -1052,7 +1063,15 @@ function renderNode(node) {
     });
 
     el.addEventListener('mousedown', onNodeMouseDown);
-    txt.addEventListener('focus', (e) => e.stopPropagation());
+    txt.addEventListener('focus', (e) => {
+      e.stopPropagation();
+      state.selectedNode = node;
+      // Sync toolbar to this node's current values
+      syncToolbarToNode(node);
+      // Visual selection ring
+      document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+      el.classList.add('selected');
+    });
     txt.addEventListener('blur', () => {
       node.text = txt.innerText;
       updateLines();
@@ -1125,9 +1144,9 @@ function applyNodeStyle(node) {
   if (node.done) el.classList.add('done');
   else el.classList.remove('done');
 
-  if (node.shape === 'diamond') txt.style.padding = '14px 20px';
-  else if (node.shape === 'heart' || node.shape === 'star') txt.style.padding = '16px 12px';
-  else txt.style.padding = '10px 18px';
+  if (node.shape === 'diamond') txt.style.padding = '18px 24px';
+  else if (node.shape === 'heart' || node.shape === 'star') txt.style.padding = '20px 16px';
+  else txt.style.padding = '10px 14px';
 
   // ── Image rendering ──
   const inner = el.querySelector('.node-inner');
@@ -1607,6 +1626,41 @@ function applyTransform() {
 function updateCanvas() { applyTransform(); updateLines(); }
 
 // ════════════════════════════════════════════
+//  SELECTION & LIVE EDITING
+// ════════════════════════════════════════════
+function syncToolbarToNode(node) {
+  // Font
+  document.getElementById('sel-font').value = node.font;
+  document.getElementById('inp-fsize').value = node.fontSize;
+  document.getElementById('btn-bold').classList.toggle('active', node.bold);
+  document.getElementById('btn-italic').classList.toggle('active', node.italic);
+  document.getElementById('btn-under').classList.toggle('active', node.underline);
+  // Colors
+  document.getElementById('inp-fill').value = node.fill;
+  document.getElementById('swatch-fill-preview').style.background = node.fill;
+  document.getElementById('inp-line').value = node.lineColor;
+  document.getElementById('swatch-line-preview').style.background = node.lineColor;
+  document.getElementById('inp-text').value = node.textColor;
+  document.getElementById('swatch-text-preview').style.background = node.textColor;
+}
+
+function applyToSelected(fn) {
+  if (state.selectedNode) {
+    fn(state.selectedNode);
+    applyNodeStyle(state.selectedNode);
+    updateLines();
+  }
+}
+
+// Deselect when clicking canvas
+document.getElementById('canvas-wrap').addEventListener('mousedown', (e) => {
+  if (!e.target.closest('.node')) {
+    state.selectedNode = null;
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+  }
+});
+
+// ════════════════════════════════════════════
 //  BUTTONS
 // ════════════════════════════════════════════
 addBtn.addEventListener('click', () => {
@@ -1641,13 +1695,20 @@ function selectAll(el) {
 // Toolbar Events
 document.querySelectorAll('.shape-btn').forEach(btn => btn.addEventListener('click', () => {
   document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active'); state.shape = btn.dataset.shape;
+  btn.classList.add('active');
+  state.shape = btn.dataset.shape;
+  applyToSelected(n => { n.shape = btn.dataset.shape; });
 }));
 
 ['fill', 'line', 'text'].forEach(type => {
   document.getElementById('inp-' + type).addEventListener('input', (e) => {
     state[type + 'Color'] = e.target.value;
     document.getElementById('swatch-' + type + '-preview').style.background = e.target.value;
+    applyToSelected(n => {
+      if (type === 'fill') n.fill = e.target.value;
+      else if (type === 'line') n.lineColor = e.target.value;
+      else n.textColor = e.target.value;
+    });
   });
 });
 
@@ -1685,19 +1746,29 @@ function updateToolbarUI(activeId, text, color) {
 }
 
 // Font, Size, Bold, Italic, Underline
-document.getElementById('sel-font').addEventListener('change', (e) => { state.font = e.target.value; });
-document.getElementById('inp-fsize').addEventListener('input', (e) => { state.fontSize = parseInt(e.target.value) || 14; });
+document.getElementById('sel-font').addEventListener('change', (e) => {
+  state.font = e.target.value;
+  applyToSelected(n => { n.font = e.target.value; });
+});
+document.getElementById('inp-fsize').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value) || 14;
+  state.fontSize = v;
+  applyToSelected(n => { n.fontSize = v; });
+});
 document.getElementById('btn-bold').addEventListener('click', () => {
   state.bold = !state.bold;
   document.getElementById('btn-bold').classList.toggle('active', state.bold);
+  applyToSelected(n => { n.bold = state.bold; });
 });
 document.getElementById('btn-italic').addEventListener('click', () => {
   state.italic = !state.italic;
   document.getElementById('btn-italic').classList.toggle('active', state.italic);
+  applyToSelected(n => { n.italic = state.italic; });
 });
 document.getElementById('btn-under').addEventListener('click', () => {
   state.underline = !state.underline;
   document.getElementById('btn-under').classList.toggle('active', state.underline);
+  applyToSelected(n => { n.underline = state.underline; });
 });
 
 // Color popup wheel sync
@@ -1738,7 +1809,18 @@ function openPopup(target, currentColor, anchorEl) {
 
 ['fill', 'line', 'text'].forEach(t => {
   document.getElementById('swatch-' + t).addEventListener('click', (e) => {
-    if (e.target.tagName !== 'INPUT') openPopup(t, state[t + 'Color'], document.getElementById('swatch-' + t));
+    if (e.target.tagName !== 'INPUT') {
+      // Use selected node's color if available, else global state
+      let currentColor;
+      if (state.selectedNode) {
+        currentColor = t === 'fill' ? state.selectedNode.fill
+                     : t === 'line' ? state.selectedNode.lineColor
+                     : state.selectedNode.textColor;
+      } else {
+        currentColor = state[t + 'Color'];
+      }
+      openPopup(t, currentColor, document.getElementById('swatch-' + t));
+    }
   });
 });
 
@@ -1811,6 +1893,12 @@ function applyPopupColor(color) {
   state[popupTarget + 'Color'] = color;
   document.getElementById('swatch-' + popupTarget + '-preview').style.background = color;
   document.getElementById('inp-' + popupTarget).value = color;
+  // Apply to selected node
+  applyToSelected(n => {
+    if (popupTarget === 'fill') n.fill = color;
+    else if (popupTarget === 'line') n.lineColor = color;
+    else n.textColor = color;
+  });
 }
 
 function hexAlpha(hex, alpha) {
