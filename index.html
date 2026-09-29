@@ -1100,7 +1100,26 @@ function renderNode(node) {
     });
     txt.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Escape') txt.blur();
+      if (e.key === 'Escape') { txt.blur(); return; }
+
+      // Enter → new line starting with a sakura bullet
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        const sel = window.getSelection();
+        const cur = sel.anchorNode;
+        // Enter on an empty bullet line ends the list (removes the bullet, plain new line)
+        if (cur && cur.nodeType === 3 && cur.textContent.trim() === '🌸') {
+          const r = document.createRange();
+          r.selectNodeContents(cur);
+          sel.removeAllRanges();
+          sel.addRange(r);
+          document.execCommand('delete');
+          document.execCommand('insertParagraph');
+          return;
+        }
+        document.execCommand('insertParagraph');
+        document.execCommand('insertText', false, '🌸 ');
+      }
     });
     
     el.addEventListener('click', (e) => {
