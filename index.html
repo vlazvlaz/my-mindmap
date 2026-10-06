@@ -256,11 +256,17 @@
     box-sizing: border-box;
     padding: 10px 14px;
     line-height: 1.35;
-    cursor: text;
+    cursor: inherit;                /* grab cursor: bubble is draggable until edit mode */
     align-self: center;             /* vertical centering inside the bubble */
     min-height: 1em;
   }
   .node-text > div, .node-text > p { margin: 0; }
+  /* edit mode (double-click): normal text cursor + text selection */
+  .node-text[contenteditable="true"] {
+    cursor: text;
+    -webkit-user-select: text;
+    user-select: text;
+  }
 
   /* shapes via clip-path / border-radius on node-bg */
   .node-bg.rect { border-radius: 10px; }
@@ -946,6 +952,7 @@ function loadMindmapData(data) {
       x: Number(node.x) || 0,
       y: Number(node.y) || 0,
       text: String(node.text || ''),
+      html: node.html ? sanitizeRichHtml(String(node.html)) : '',
       shape: node.shape || 'rounded',
       fill: node.fill || '#ff5774',
       lineColor: node.lineColor || '#57d4ff',
@@ -1056,9 +1063,9 @@ function renderNode(node) {
     bg.className = 'node-bg ' + node.shape;
     const txt = document.createElement('div');
     txt.className = 'node-text';
-    txt.contentEditable = 'true';
+    txt.contentEditable = 'false';
     txt.spellcheck = false;
-    txt.innerText = node.text;
+    if (node.html) txt.innerHTML = node.html; else txt.innerText = node.text;
 
     inner.appendChild(bg);
     inner.appendChild(txt);
@@ -1083,12 +1090,26 @@ function renderNode(node) {
       document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
       el.classList.add('selected');
     });
-    txt.addEventListener('blur', () => {
+    txt.addEventListener('blur', (e) => {
       node.text = txt.innerText;
+      node.html = txt.innerHTML;
+      // focus moved to a toolbar control (size box, font select, color…): stay in edit mode
+      if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#toolbar')) return;
+      txt.contentEditable = 'false';
+      window.getSelection().removeAllRanges();
+      richSel = null;
       updateLines();
+    });
+    // Double-click → switch this bubble into text-edit mode
+    txt.addEventListener('dblclick', (e) => {
+      if (state.taskMode || state.removeMode || state.imageMode || state.connectMode) return;
+      e.preventDefault();
+      e.stopPropagation();
+      startTextEdit(txt, e.clientX, e.clientY);
     });
     txt.addEventListener('input', () => {
       node.text = txt.innerText;
+      node.html = txt.innerHTML;
       updateNodeSize(node);
       updateLines();
     });
@@ -1512,19 +1533,174 @@ function removeNode(id) {
 // ════════════════════════════════════════════
 //  DRAG & PAN
 // ════════════════════════════════════════════
+// ════════════════════════════════════════════
+//  RICH TEXT (format only the selected text)
+// ════════════════════════════════════════════
+let richSel = null; // { txt, range } – last non-empty selection inside an editing bubble
+
+function sanitizeRichHtml(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const okTags = new Set(['SPAN','B','I','U','STRONG','EM','DIV','P','BR']);
+  const okProps = new Set(['font-size','font-weight','font-style','text-decoration','text-decoration-line','color','font-family']);
+  (function walk(parent) {
+    [...parent.childNodes].forEach(c => {
+      if (c.nodeType === 3) return;
+      if (c.nodeType !== 1 || !okTags.has(c.tagName)) { c.remove(); return; }
+      const st = [];
+      for (let i = 0; i < c.style.length; i++) {
+        const prop = c.style[i], val = c.style.getPropertyValue(prop);
+        if (okProps.has(prop) && !/[();{}<>\\]|url|expression/i.test(val.replace(/rgba?\([^)]*\)/i, ''))) st.push(prop + ':' + val);
+      }
+      [...c.attributes].forEach(a => c.removeAttribute(a.name));
+      if (st.length) c.setAttribute('style', st.join(';'));
+      walk(c);
+    });
+  })(tpl.content);
+  return tpl.innerHTML;
+}
+
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  const host = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentElement;
+  const txt = host && host.closest && host.closest('.node-text');
+  if (txt && txt.isContentEditable && !r.collapsed) richSel = { txt, range: r.cloneRange() };
+  else if (txt && txt.isContentEditable) richSel = null; // caret only → whole-node formatting
+});
+
+// Returns the editing bubble's text element if there is a live text selection, else null
+function getRichTarget() {
+  if (!richSel || !richSel.txt.isContentEditable || !document.body.contains(richSel.txt)) return null;
+  return richSel;
+}
+
+// Run fn(exec) on the saved selection, then refocus whatever control the user was using
+function applyToSelection(fn) {
+  const t = getRichTarget();
+  if (!t) return false;
+  const prev = document.activeElement;
+  t.txt.focus();
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(t.range);
+  document.execCommand('styleWithCSS', false, true);
+  fn();
+  // remember the (possibly changed) selection and persist
+  if (sel.rangeCount && !sel.getRangeAt(0).collapsed) richSel = { txt: t.txt, range: sel.getRangeAt(0).cloneRange() };
+  const node = state.nodes.find(n => 'node-' + n.id === t.txt.closest('.node').id);
+  if (node) {
+    node.text = t.txt.innerText;
+    node.html = t.txt.innerHTML;
+    updateNodeSize(node);
+  }
+  if (prev && prev !== t.txt && prev.closest && prev.closest('#toolbar') && prev.focus) prev.focus();
+  return true;
+}
+
+function applySelFontSize(px) {
+  return applyToSelection(() => {
+    document.execCommand('styleWithCSS', false, false);
+    document.execCommand('fontSize', false, '7');
+    document.execCommand('styleWithCSS', false, true);
+    const t = richSel && richSel.txt;
+    (t || document).querySelectorAll('font[size="7"]').forEach(f => {
+      const sp = document.createElement('span');
+      sp.style.fontSize = px + 'px';
+      while (f.firstChild) sp.appendChild(f.firstChild);
+      f.replaceWith(sp);
+    });
+    // drop font-size on nested spans inside the new span so the chosen size wins
+    (t || document).querySelectorAll('span[style*="font-size"] span[style*="font-size"]').forEach(inner => {
+      inner.style.fontSize = '';
+    });
+    // re-select the formatted content
+    if (t) {
+      const spans = [...t.querySelectorAll('span')].filter(x => x.style.fontSize === px + 'px');
+      if (spans.length) {
+        const r = document.createRange();
+        r.setStartBefore(spans[0]); r.setEndAfter(spans[spans.length - 1]);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      }
+    }
+  });
+}
+
+// Clicking anywhere outside the toolbar / the text being edited ends edit mode
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest('#toolbar') || e.target.closest('.popup, #color-popup')) return;
+  document.querySelectorAll('.node-text[contenteditable="true"]').forEach(t => {
+    if (t.contains(e.target)) return;
+    const node = state.nodes.find(n => 'node-' + n.id === t.closest('.node').id);
+    if (node) { node.text = t.innerText; node.html = t.innerHTML; }
+    t.contentEditable = 'false';
+    if (document.activeElement !== t) { /* focus was in toolbar */ }
+    else t.blur();
+    richSel = null;
+  });
+}, true);
+
+// keep the text selection when clicking toolbar buttons
+document.getElementById('toolbar').addEventListener('mousedown', (e) => {
+  if (e.target.closest('button') && getRichTarget()) e.preventDefault();
+});
+
+function isEditingText() {
+  const a = document.activeElement;
+  return !!(a && a.classList && a.classList.contains('node-text') && a.isContentEditable);
+}
+
+function startTextEdit(txt, x, y) {
+  txt.contentEditable = 'true';
+  txt.focus();
+  // place caret where the user double-clicked, then select that word
+  let range = null;
+  if (x != null) {
+    if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(x, y);
+    else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(x, y);
+      if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+    }
+  }
+  const sel = window.getSelection();
+  if (range && txt.contains(range.startContainer)) {
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (sel.modify) {
+      sel.modify('move', 'backward', 'word');
+      sel.modify('extend', 'forward', 'word');
+    }
+  } else {
+    selectAll(txt);
+  }
+}
+
 function onNodeMouseDown(e) {
   // 1. Abbruch bei Menüs oder Spezialmodi
   if (e.target.closest('.node-controls') || e.target.closest('.resize-handle') || state.taskMode || state.removeMode || state.imageMode) return;
+
+  // While the text is in edit mode, clicks inside it select/place the caret – no dragging
+  if (e.target.classList.contains('node-text') && e.target.isContentEditable) {
+    e.stopPropagation();
+    return;
+  }
+  // Clicking elsewhere on a bubble ends text editing so it can be moved
+  if (isEditingText()) document.activeElement.blur();
 
   const el = e.currentTarget;
   const node = state.nodes.find(n => 'node-' + n.id === el.id);
   if (!node) return;
 
+  // select bubble (ring + toolbar sync), as focus used to do
+  state.selectedNode = node;
+  syncToolbarToNode(node);
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+  el.classList.add('selected');
+
   // 2. DER FIX: Wenn auf Text geklickt wird, KEIN preventDefault.
   // Das erlaubt dem Browser, den Cursor in den Text zu setzen.
-  if (!e.target.classList.contains('node-text')) {
-    e.preventDefault(); 
-  }
+  e.preventDefault();
 
   e.stopPropagation();
 
@@ -1722,7 +1898,7 @@ addBtn.addEventListener('click', () => {
 
   setTimeout(() => {
     const txt = document.getElementById('node-' + node.id)?.querySelector('.node-text');
-    if (txt) { txt.focus(); selectAll(txt); }
+    if (txt) startTextEdit(txt);
     updateLines();
   }, 50);
 });
@@ -1742,6 +1918,10 @@ document.querySelectorAll('.shape-btn').forEach(btn => btn.addEventListener('cli
 
 ['fill', 'line', 'text'].forEach(type => {
   document.getElementById('inp-' + type).addEventListener('input', (e) => {
+    if (type === 'text' && applyToSelection(() => document.execCommand('foreColor', false, e.target.value))) {
+      document.getElementById('swatch-text-preview').style.background = e.target.value;
+      return;
+    }
     state[type + 'Color'] = e.target.value;
     document.getElementById('swatch-' + type + '-preview').style.background = e.target.value;
     applyToSelected(n => {
@@ -1787,25 +1967,30 @@ function updateToolbarUI(activeId, text, color) {
 
 // Font, Size, Bold, Italic, Underline
 document.getElementById('sel-font').addEventListener('change', (e) => {
+  if (applyToSelection(() => document.execCommand('fontName', false, e.target.value))) return;
   state.font = e.target.value;
   applyToSelected(n => { n.font = e.target.value; });
 });
 document.getElementById('inp-fsize').addEventListener('input', (e) => {
   const v = parseInt(e.target.value) || 14;
+  if (getRichTarget()) { applySelFontSize(v); return; }
   state.fontSize = v;
   applyToSelected(n => { n.fontSize = v; });
 });
 document.getElementById('btn-bold').addEventListener('click', () => {
+  if (applyToSelection(() => document.execCommand('bold'))) return;
   state.bold = !state.bold;
   document.getElementById('btn-bold').classList.toggle('active', state.bold);
   applyToSelected(n => { n.bold = state.bold; });
 });
 document.getElementById('btn-italic').addEventListener('click', () => {
+  if (applyToSelection(() => document.execCommand('italic'))) return;
   state.italic = !state.italic;
   document.getElementById('btn-italic').classList.toggle('active', state.italic);
   applyToSelected(n => { n.italic = state.italic; });
 });
 document.getElementById('btn-under').addEventListener('click', () => {
+  if (applyToSelection(() => document.execCommand('underline'))) return;
   state.underline = !state.underline;
   document.getElementById('btn-under').classList.toggle('active', state.underline);
   applyToSelected(n => { n.underline = state.underline; });
