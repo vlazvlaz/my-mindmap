@@ -269,9 +269,10 @@
   }
 
   /* shapes via clip-path / border-radius on node-bg */
-  .node-bg.rect { border-radius: 10px; }
+  /* .node-bg.rect { border-radius: 10px; } */
   .node-bg.rounded { border-radius: 50px; }
-  .node-bg.oval { border-radius: 50%; }
+  /* .node-bg.oval { border-radius: 50%; } */
+  /* SHAPES DISABLED FOR NOW (diamond, heart, star, hexagon):
   .node-bg.diamond {
     transform: rotate(45deg);
     border-radius: 6px;
@@ -285,6 +286,7 @@
   .node-bg.hexagon {
     clip-path: polygon(25% 6.7%, 75% 6.7%, 100% 50%, 75% 93.3%, 25% 93.3%, 0% 50%);
   }
+  */
   .node-bg.cloud {
     border-radius: 50px;
     box-shadow: inset 0 0 0 0 transparent;
@@ -653,6 +655,7 @@
 <body>
 
 <!-- SVG defs for heart clip -->
+<!-- DISABLED FOR NOW (heart shape)
 <svg width="0" height="0" style="position:absolute">
   <defs>
     <clipPath id="heart-clip" clipPathUnits="objectBoundingBox">
@@ -660,6 +663,7 @@
     </clipPath>
   </defs>
 </svg>
+-->
 
 <!-- TOOLBAR -->
 <div id="toolbar">
@@ -668,12 +672,14 @@
 
   <span class="tb-label">Form</span>
   <button class="tb-btn shape-btn active" data-shape="rounded" title="Oval/Pill">⬭</button>
+  <!-- DISABLED FOR NOW:
   <button class="tb-btn shape-btn" data-shape="rect" title="Rechteck">⬜</button>
   <button class="tb-btn shape-btn" data-shape="oval" title="Ellipse">⬤</button>
   <button class="tb-btn shape-btn" data-shape="heart" title="Herz">♥</button>
   <button class="tb-btn shape-btn" data-shape="diamond" title="Raute">◆</button>
   <button class="tb-btn shape-btn" data-shape="star" title="Stern">★</button>
   <button class="tb-btn shape-btn" data-shape="hexagon" title="Hexagon">⬡</button>
+  -->
   <button class="tb-btn" id="btn-connect" title="Connect nodes">🔗 Verbinden</button>
   <button class="tb-btn danger" id="btn-remove-link" title="Del Line">✕ Linie löschen</button>
   <button class="tb-btn" id="btn-image-mode" title="Bild in Knoten einfügen">🖼 Bild einfügen</button>
@@ -931,7 +937,7 @@ function loadMindmapData(data) {
   state.links = Array.isArray(data.state.links) ? data.state.links : [];
   state.idCounter = Number(data.state.idCounter) || 0;
 
-  state.shape = data.state.shape || 'rounded';
+  state.shape = 'rounded'; // other shapes disabled for now (was: data.state.shape || 'rounded')
   state.fillColor = data.state.fillColor || '#ff5774';
   state.lineColor = data.state.lineColor || '#57d4ff';
   state.textColor = data.state.textColor || '#0a0a0a';
@@ -953,7 +959,7 @@ function loadMindmapData(data) {
       y: Number(node.y) || 0,
       text: String(node.text || ''),
       html: node.html ? sanitizeRichHtml(String(node.html)) : '',
-      shape: node.shape || 'rounded',
+      shape: 'rounded', // other shapes disabled for now (was: node.shape || 'rounded')
       fill: node.fill || '#ff5774',
       lineColor: node.lineColor || '#57d4ff',
       textColor: node.textColor || '#0a0a0a',
@@ -1207,9 +1213,10 @@ function applyNodeStyle(node) {
   if (node.done) el.classList.add('done');
   else el.classList.remove('done');
 
-  if (node.shape === 'diamond') txt.style.padding = '18px 24px';
-  else if (node.shape === 'heart' || node.shape === 'star') txt.style.padding = '20px 16px';
-  else txt.style.padding = '10px 14px';
+  // if (node.shape === 'diamond') txt.style.padding = '18px 24px';
+  // else if (node.shape === 'heart' || node.shape === 'star') txt.style.padding = '20px 16px';
+  // else
+  txt.style.padding = '10px 14px';
 
   // ── Image rendering ──
   const inner = el.querySelector('.node-inner');
@@ -1285,15 +1292,15 @@ function updateNodeSize(node) {
     const h = inner.offsetHeight;
     bg.style.width = w + 'px';
     bg.style.height = h + 'px';
-    if (node.shape === 'diamond') {
-      bg.style.width = w + 'px';
-      bg.style.height = w + 'px';
-    }
-    if (node.shape === 'oval' || node.shape === 'heart' || node.shape === 'star') {
-      const s = Math.max(w, h) * 1.1;
-      bg.style.width = s + 'px';
-      bg.style.height = s + 'px';
-    }
+    // if (node.shape === 'diamond') {
+    //   bg.style.width = w + 'px';
+    //   bg.style.height = w + 'px';
+    // }
+    // if (node.shape === 'oval' || node.shape === 'heart' || node.shape === 'star') {
+    //   const s = Math.max(w, h) * 1.1;
+    //   bg.style.width = s + 'px';
+    //   bg.style.height = s + 'px';
+    // }
     updateLines();
   });
 }
