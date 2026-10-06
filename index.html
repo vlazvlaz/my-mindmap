@@ -683,9 +683,9 @@
   <button class="tb-btn" id="btn-connect" title="Connect nodes">🔗 Verbinden</button>
   <button class="tb-btn danger" id="btn-remove-link" title="Del Line">✕ Linie löschen</button>
   <button class="tb-btn" id="btn-image-mode" title="Bild in Knoten einfügen">🖼 Bild einfügen</button>
-  <button class="tb-btn" id="btn-save-png" title="Export png">💾 PNG Export</button>
-  <button class="tb-btn" id="btn-save-json" title="Bearbeitbare Mindmap herunterladen">⬇ Download</button>
-  <button class="tb-btn" id="btn-load-json" title="Bearbeitbare Mindmap laden">⬆ Load</button>
+  <button class="tb-btn" id="btn-save-svg" title="Export svg">💾 SVG Export</button>
+  <button class="tb-btn" id="btn-save-json" title="Bearbeitbare Mindmap herunterladen">⬇ Mindmap speichern</button>
+  <button class="tb-btn" id="btn-load-json" title="Bearbeitbare Mindmap laden">⬆ Mindmap laden</button>
   <input type="file" id="inp-load-json" accept="application/json,.json" style="display:none">
   
   <div class="tb-sep"></div>
@@ -799,7 +799,6 @@
 </div>
 <input type="file" id="inp-image" accept="image/*" style="display:none">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 // ════════════════════════════════════════════
@@ -2067,64 +2066,202 @@ document.getElementById('popup-apply').addEventListener('click', () => {
   document.getElementById('color-popup').classList.remove('visible');
 });
 
-document.getElementById('btn-save-png').addEventListener('click', () => {
-  const canvasElement = document.getElementById('canvas');
-  
+// ════════════════════════════════════════════
+//  SVG EXPORT (real vector: shapes, wavy lines, text as <text>)
+// ════════════════════════════════════════════
+document.getElementById('btn-save-svg').addEventListener('click', () => {
   if (state.nodes.length === 0) {
     alert("Keine Elemente zum Exportieren vorhanden.");
     return;
   }
+  try {
+    const svgString = buildMindmapSvg();
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = 'mindmap-ausschnitt.svg';
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    console.error("SVG-Export fehlgeschlagen:", err);
+    alert("SVG-Export fehlgeschlagen: " + err.message);
+  }
+});
 
-  // 1. Die äußersten Punkte (Bounding Box) berechnen
+function buildMindmapSvg() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs = {}) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+
+  // 1. bounding box of all bubbles
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  
+  const items = [];
   state.nodes.forEach(node => {
     const el = document.getElementById('node-' + node.id);
-    // Wir nehmen die echte Breite/Höhe des Elements inkl. Padding
-    const w = el ? el.offsetWidth : 150; 
-    const h = el ? el.offsetHeight : 80;
-    
-    if (node.x < minX) minX = node.x;
-    if (node.y < minY) minY = node.y;
-    if (node.x + w > maxX) maxX = node.x + w;
-    if (node.y + h > maxY) maxY = node.y + h;
+    if (!el) return;
+    const inner = el.querySelector('.node-inner');
+    const x = node.x + inner.offsetLeft, y = node.y + inner.offsetTop;
+    const w = inner.offsetWidth, h = inner.offsetHeight;
+    minX = Math.min(minX, x); minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+    items.push({ node, el, inner, x, y, w, h });
+  });
+  const pad = 30;
+  const vx = minX - pad, vy = minY - pad;
+  const vw = (maxX - minX) + pad * 2, vh = (maxY - minY) + pad * 2;
+
+  const svg = mk('svg', {
+    xmlns: NS,
+    'xmlns:xlink': 'http://www.w3.org/1999/xlink',
+    width: vw, height: vh,
+    viewBox: `${vx} ${vy} ${vw} ${vh}`
   });
 
-  // 2. Rand hinzufügen (30px)
-  const padding = 30;
-  const exportX = minX - padding;
-  const exportY = minY - padding;
-  const exportWidth = (maxX - minX) + (padding * 2);
-  const exportHeight = (maxY - minY) + (padding * 2);
+  // web fonts (works when the SVG is opened in a browser)
+  const style = document.createElementNS(NS, 'style');
+  style.textContent = "@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');";
+  svg.appendChild(style);
 
-  // 3. Zoom/Pan temporär für den Snapshot deaktivieren
-  const oldTransform = canvasElement.style.transform;
-  canvasElement.style.transform = 'none';
+  const defs = mk('defs');
+  svg.appendChild(defs);
 
-  // 4. Export mit exaktem Ausschnitt
-  html2canvas(canvasElement, {
-    backgroundColor: null,
-    scale: 2,             // Hohe Auflösung
-    x: exportX,           // Startpunkt X
-    y: exportY,           // Startpunkt Y
-    width: exportWidth,   // Breite des Ausschnitts
-    height: exportHeight, // Höhe des Ausschnitts
-    logging: false,
-    useCORS: true
-  }).then(exportCanvas => {
-    // Ansicht wiederherstellen
-    canvasElement.style.transform = oldTransform;
-
-    // Download
-    const link = document.createElement('a');
-    link.download = 'mindmap-ausschnitt.png';
-    link.href = exportCanvas.toDataURL('image/png');
-    link.click();
-  }).catch(err => {
-    console.error("Export fehlgeschlagen:", err);
-    canvasElement.style.transform = oldTransform;
+  // 2. connection lines (static copy of the live ones)
+  const linesG = mk('g', { id: 'lines' });
+  linesEl.querySelectorAll('defs').forEach(d => {
+    d.querySelectorAll('linearGradient').forEach(g => defs.appendChild(g.cloneNode(true)));
   });
-});
+  linesEl.querySelectorAll('path.wavy-line').forEach(pth => {
+    linesG.appendChild(mk('path', {
+      d: pth.getAttribute('d'),
+      fill: 'none',
+      stroke: pth.getAttribute('stroke'),
+      'stroke-width': 2,
+      'stroke-linecap': 'round',
+      opacity: 0.75
+    }));
+  });
+  svg.appendChild(linesG);
+
+  // helpers
+  const doneColor = (hex) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    const l = 0.299 * r + 0.587 * g + 0.114 * b;
+    const sat = 0.3, br = 0.45;
+    [r, g, b] = [r, g, b].map(c => Math.round(Math.max(0, Math.min(255, (l + (c - l) * sat) * br))));
+    return '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+  };
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  const ascentOf = (cs) => {
+    measureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const m = measureCtx.measureText('Hg');
+    return m.fontBoundingBoxAscent != null ? m.fontBoundingBoxAscent : parseFloat(cs.fontSize) * 0.8;
+  };
+
+  // 3. bubbles (center bubble last = on top)
+  items.sort((a, b) => (a.el.classList.contains('center-node') ? 1 : 0) - (b.el.classList.contains('center-node') ? 1 : 0));
+
+  items.forEach((it, idx) => {
+    const { node, el, inner, x, y, w, h } = it;
+    const done = !!node.done;
+    const fill = done ? doneColor(node.fill) : node.fill;
+    const r = Math.min(50, w / 2, h / 2);   // pill shape (border-radius: 50px)
+    const g = mk('g', { transform: `translate(${x} ${y})` });
+
+    // glow (box-shadow 0 2px 16px) – blurred copy
+    const fid = 'glow-' + idx;
+    const filter = mk('filter', { id: fid, x: '-50%', y: '-50%', width: '200%', height: '200%' });
+    filter.appendChild(mk('feGaussianBlur', { stdDeviation: 8 }));
+    defs.appendChild(filter);
+    g.appendChild(mk('rect', { x: 0, y: 2, width: w, height: h, rx: r, fill: fill, opacity: 0.25, filter: `url(#${fid})` }));
+
+    // thin outer ring (box-shadow 0 0 0 1.5px)
+    g.appendChild(mk('rect', { x: -0.75, y: -0.75, width: w + 1.5, height: h + 1.5, rx: r + 0.75, fill: 'none', stroke: fill, 'stroke-opacity': 0.4, 'stroke-width': 1.5 }));
+
+    // body
+    if (node.image) {
+      g.appendChild(mk('rect', { x: 0, y: 0, width: w, height: h, rx: r, fill: fill, 'fill-opacity': 0.25 }));
+      const cid = 'clip-' + idx;
+      const cp = mk('clipPath', { id: cid });
+      cp.appendChild(mk('rect', { x: 0, y: 0, width: w, height: h, rx: r }));
+      defs.appendChild(cp);
+      const scale = (node.imgScale || 100) / 100;
+      let iw = w, ih = h;
+      if (node.imgNaturalW && node.imgNaturalH) {
+        const cover = Math.max(w / node.imgNaturalW, h / node.imgNaturalH);
+        iw = node.imgNaturalW * cover * scale;
+        ih = node.imgNaturalH * cover * scale;
+      }
+      const ix = (w - iw) / 2 + (node.imgX || 0), iy = (h - ih) / 2 + (node.imgY || 0);
+      const img = mk('image', { x: ix, y: iy, width: iw, height: ih, preserveAspectRatio: 'none', 'clip-path': `url(#${cid})` });
+      img.setAttribute('href', node.image);
+      img.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', node.image);
+      g.appendChild(img);
+    } else {
+      g.appendChild(mk('rect', { x: 0, y: 0, width: w, height: h, rx: r, fill: fill }));
+    }
+
+    // text: one <text> per visual line / style run, positioned from the live layout
+    const txt = el.querySelector('.node-text');
+    const ir = inner.getBoundingClientRect();
+    const k = ir.width / inner.offsetWidth || 1;   // zoom / hover scale
+    const walker = document.createTreeWalker(txt, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let tn;
+    while ((tn = walker.nextNode())) {
+      const parent = tn.parentElement;
+      const cs = getComputedStyle(parent);
+      // text-decoration is not inherited → collect from ancestors
+      let deco = new Set();
+      for (let e = parent; e && e !== txt.parentElement; e = e.parentElement) {
+        getComputedStyle(e).textDecorationLine.split(' ').forEach(d => d !== 'none' && deco.add(d));
+      }
+      const asc = ascentOf(cs);
+      const data = tn.nodeValue;
+      let run = null;
+      const flush = () => {
+        if (!run) return;
+        const t = mk('text', {
+          x: run.x, y: run.y,
+          'font-family': cs.fontFamily,
+          'font-size': cs.fontSize,
+          'font-weight': cs.fontWeight,
+          'font-style': cs.fontStyle,
+          fill: cs.color
+        });
+        t.setAttribute('xml:space', 'preserve');
+        if (deco.size) t.setAttribute('text-decoration', [...deco].join(' '));
+        if (done) t.setAttribute('fill-opacity', 0.6);
+        t.textContent = run.s;
+        g.appendChild(t);
+        run = null;
+      };
+      for (let i = 0; i < data.length; i++) {
+        const ch = data[i];
+        if (ch === '\n') { flush(); continue; }
+        range.setStart(tn, i); range.setEnd(tn, i + 1);
+        const rc = range.getClientRects()[0];
+        if (!rc || (rc.width === 0 && /\s/.test(ch))) continue;   // collapsed whitespace at wrap points
+        const left = (rc.left - ir.left) / k;
+        const top = (rc.top - ir.top) / k;
+        if (run && Math.abs(top - run.top) > 2) flush();
+        if (!run) run = { s: '', x: left, top: top, y: top + asc };
+        run.s += ch;
+      }
+      flush();
+    }
+
+    svg.appendChild(g);
+  });
+
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svg);
+}
 
 function applyPopupColor(color) {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
